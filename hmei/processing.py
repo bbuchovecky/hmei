@@ -8,7 +8,9 @@ import xarray as xr
 import numpy as np
 import math
 
-## return the size of the dataset in gigabytes GB (not gibibytes GiB)
+
+#################################################################################
+#################################################################################
 def xr_size(da):
     """
     Description:
@@ -22,7 +24,8 @@ def xr_size(da):
     return str(da.nbytes / (1000**3))+' gigabytes'
 
 
-## view contents of a directory
+#################################################################################
+#################################################################################
 def dir_inspect(path):
     """
     Description:
@@ -35,8 +38,8 @@ def dir_inspect(path):
     return sorted(os.listdir(path))
 
 
-## opens raw data files from Froelicher et al. 2020 
-## and formats the coordinate/variable names
+#################################################################################
+#################################################################################
 def open_raw_ctrl(var):
     """
     Description:
@@ -68,7 +71,7 @@ def open_raw_ctrl(var):
         path = rootdir+subdir_ctrl+'SSS/sss_*.nc'
         print(path)
         ds = xr.open_mfdataset(path)
-        ds = ds_sss.assign_coords({'geolon_t':geolon_t, 'geolat_t':geolat_t})
+        ds = ds.assign_coords({'geolon_t':geolon_t, 'geolat_t':geolat_t})
         return ds
         
     elif (var.upper() == 'CN_INV'):
@@ -80,7 +83,7 @@ def open_raw_ctrl(var):
         ds = ds.assign_coords({'geolon_t':geolon_t, 'geolat_t':geolat_t})
         return ds
         
-    elif (var.upper() == 'CN_INV'):
+    elif (var.upper() == 'NPP'):
         path = rootdir+subdir_ctrl+'NPP/NPP_*.nc'
         print(path)
         ds = xr.open_mfdataset(path)
@@ -93,13 +96,21 @@ def open_raw_ctrl(var):
         print(path)
         ds = xr.open_mfdataset(path)
         return ds
+    
+    elif (var.lower() == 'mld'):
+        path = rootdir+subdir_ctrl+'MLD/mld_0*.nc'
+        print(path)
+        ds = xr.open_mfdataset(path)
+        return ds
 
     else:
         print('<invalid parameters>')
         return
 
-
-def open_gridcell_ctrl(var, metric=False, reg=False):
+    
+#################################################################################
+#################################################################################
+def open_gridcell_ctrl(var, metric=False, reg='global'):
     """
     Description:
         Opens processed grid-cell data (either climatology, anomaly, or variance)
@@ -118,7 +129,7 @@ def open_gridcell_ctrl(var, metric=False, reg=False):
     write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
     subdir_ctrl = 'CTRL/'
     
-    if (not reg) or (reg == 'global'):
+    if reg == 'global':
         if (var.lower() == 'sie') or (var.lower() == 'siv'):
             filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_timeseries.nc'
         else:
@@ -126,7 +137,7 @@ def open_gridcell_ctrl(var, metric=False, reg=False):
         print(filename)
         return xr.open_dataset(filename)
     
-    elif (reg) or (reg.lower() == 'so') or (reg.lower() == 'southernocean'):
+    elif (reg.lower() == 'so') or (reg.lower() == 'southernocean'):
         if (var.lower() == 'sie') or (var.lower() == 'siv'):
             filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_timeseries.nc'
         else:
@@ -139,27 +150,36 @@ def open_gridcell_ctrl(var, metric=False, reg=False):
         return
 
 
-## computes the regional or global mean of a variable
-def reg_annual_mean(ds, var, ocean_grid=False, masks=False, reg=False):
+#################################################################################
+#################################################################################
+def reg_annual_mean(ds, var, masks=False, reg='global'):
     """
     Description:
-        Computes the annual regional or global mean of a variable. Returns an
-        xarray.[]
+        Computes the annual mean timeseries of a variable over a specific region
+        or globally.
         
-    STILL WORKING
+        !! This function is experiencing bugs when generating a list of
+        annual mean timeseries for all regions from the masks parameter.
+    
+    Parameters:
+        ds         - xarray.Dataset containing raw model data
+        var        - string variable name
+        reg        - string region name
+        masks      - xarray.Dataset of regional masks
     """
     
-    if not ocean_grid:
-        ocean_grid = xr.open_dataset('/local/projects/so_predict/esm2m_froelicher/GRID/ocean.static.nc')
-    
-    area = xr.where(np.isnan(ds[var][0]), np.nan, ocean_grid['area_t'])
-    
     mask_bool = True
-    if type(masks) == type(True):
+    if type(masks) == bool:
         mask_bool = masks
     
+    ## get ocean model grid information
+    ocean_grid = xr.open_dataset('/local/projects/so_predict/esm2m_froelicher/GRID/ocean.static.nc')
+    
+    ## get grid-cell area for the ocean only
+    area = xr.where(np.isnan(ds[var][0]), np.nan, ocean_grid['area_t'])
+    
     ## global mean
-    if (not mask_bool) and (reg == False):
+    if (not mask_bool) and (reg == 'global'):
         area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
         global_var = ds[var]
         annual_mean = (global_var * ocean_grid['area_t']).groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
@@ -167,7 +187,8 @@ def reg_annual_mean(ds, var, ocean_grid=False, masks=False, reg=False):
         return annual_mean
     
     ## mean for each region from masks parameter, returns a list of timeseries
-    elif (mask_bool) and (reg == False):        
+    ## !! BUGS
+    elif (mask_bool) and (reg == 'all'):        
         annual_mean = []
         for (reg, i) in zip(masks.data_vars, range(6)):
             area = area.where(masks[reg] == 1)
@@ -179,7 +200,7 @@ def reg_annual_mean(ds, var, ocean_grid=False, masks=False, reg=False):
         return annual_mean
     
     ## mean for a single specified region from masks parameter
-    elif (mask_bool) and (reg != False):
+    elif (mask_bool) and (reg != 'global') and (reg != 'all'):
         area = area.where(masks[reg] == 1)
         area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
         reg_var = ds[var].where(masks[reg] == 1)
@@ -191,29 +212,47 @@ def reg_annual_mean(ds, var, ocean_grid=False, masks=False, reg=False):
         print('<invalid parameters>')
         return
     
+
+#################################################################################
+#################################################################################
+def reg_annual_anom(ds, var, masks=False, reg='global'):
+    """
+    Description:
+        Computes the annual anomaly timeseries of a variable over a specific region
+        or globally.
+        
+        !! This function is experiencing bugs when generating a list of
+        annual anomaly timeseries for all regions from the masks parameter.
     
-## computes the regional or global mean of a variable
-def reg_annual_anom(ds, var, ocean_grid=False, masks=False, reg=False):
-    if not ocean_grid:
-        ocean_grid = xr.open_dataset('/local/projects/so_predict/esm2m_froelicher/GRID/ocean.static.nc')
-    
-    area = xr.where(np.isnan(ds[var][0]), np.nan, ocean_grid['area_t'])
-    
+    Parameters:
+        ds         - xarray.Dataset containing raw model data
+        var        - string variable name
+        reg        - string region name
+        masks      - xarray.Dataset of regional masks
+    """
+
     mask_bool = True
     if type(masks) == type(True):
         mask_bool = masks
+    
+    ## get ocean model grid information
+    ocean_grid = xr.open_dataset('/local/projects/so_predict/esm2m_froelicher/GRID/ocean.static.nc')
+    
+    ## get grid-cell area for the ocean only
+    area = xr.where(np.isnan(ds[var][0]), np.nan, ocean_grid['area_t'])
 
     ## global anomaly
-    if (not mask_bool) and (reg == False):
-        annual_mean = reg_annual_mean(ds, var, ocean_grid)
+    if (not mask_bool) and (reg == 'global'):
+        annual_mean = reg_annual_mean(ds, var)
         single_mean = annual_mean.mean(dim='year')
         annual_anom = annual_mean - single_mean
         annual_anom.name = annual_anom.name.removesuffix('annual_mean') + 'yearly_anomaly'
         return annual_anom
         
     ## anomaly for each region from masks parameter, returns a list of timeseries
-    elif (mask_bool) and (reg == False):
-        annual_mean = reg_annual_mean(ds, var, ocean_grid, masks)
+    ## !! BUGS
+    elif (mask_bool) and (reg == 'all'):
+        annual_mean = reg_annual_mean(ds, var, masks)
         single_mean = []
         for reg in annual_mean:
             single_mean.append(reg.mean(dim='year'))
@@ -226,11 +265,112 @@ def reg_annual_anom(ds, var, ocean_grid=False, masks=False, reg=False):
         return annual_anom
         
     ## anomaly for a single specified region from masks parameter
-    elif (mask_bool) and (reg != False):
-        annual_mean = reg_annual_mean(ds, var, ocean_grid, masks, reg)
+    elif (mask_bool) and (reg != 'global') and (reg != 'all'):
+        annual_mean = reg_annual_mean(ds, var, masks, reg)
         single_mean = annual_mean.mean(dim='year')
         annual_anom = annual_mean - single_mean
         annual_anom.name = anom.name.removesuffix('annual_mean') + 'yearly_anomaly'
+        return annual_anom
+        
+    else:
+        print('<invalid parameters>')
+        return
+
+
+#################################################################################
+#################################################################################
+def reg_monthly_mean(ds, var, masks=False, reg='global'):
+    
+    mask_bool = True
+    if type(masks) == type(True):
+        mask_bool = masks
+    
+    ## get ocean model grid information
+    ocean_grid = xr.open_dataset('/local/projects/so_predict/esm2m_froelicher/GRID/ocean.static.nc')
+    
+    ## get grid-cell area for the ocean only
+    area = xr.where(np.isnan(ds[var][0]), np.nan, ocean_grid['area_t'])
+
+    ## global mean
+    if (not mask_bool) and (reg == 'global'):
+        area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
+        global_var = ds[var]
+        monthly_mean = (global_var * ocean_grid['area_t']).sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
+        monthly_mean.name = 'Global_' + var + '_monthly_mean'
+        return monthly_mean
+    
+    ## mean for each region from masks parameter, returns a list of timeseries
+    ## !! BUGS
+    elif (mask_bool) and (reg == 'all'):
+        monthly_mean = []
+        for (reg, i) in zip(masks.data_vars, range(6)):
+            area = area.where(masks[reg] == 1)
+            area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
+            reg_var = ds[var].where(masks[reg] == 1)
+            reg_mean = (reg_var * ocean_grid['area_t']).sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
+            reg_mean.name = reg + '_' + var + '_monthly_mean'
+            monthly_mean.append(reg_mean)
+        return monthly_mean
+    
+    ## mean for a single specified region from masks parameter
+    elif (mask_bool) and (reg != 'global') and (reg != 'all'):
+        area = area.where(masks[reg] == 1)
+        area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
+        reg_var = ds[var].where(masks[reg] == 1)
+        monthly_mean = (reg_var * ocean_grid['area_t']).sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
+        monthly_mean.name = reg + '_' + var + '_monthly_mean'
+        return monthly_mean
+    
+    else:
+        print('<invalid parameters>')
+        return
+
+
+#################################################################################
+#################################################################################
+def reg_monthly_anom(ds, var, masks=False, reg='global'):
+    """
+    Description:
+        Computes the monthly anomaly timeseries of a variable over a specific region
+        or globally.
+        
+        !! This function is experiencing bugs when generating a list of
+        monthly anomaly timeseries for all regions from the masks parameter.
+    
+    Parameters:
+        ds         - xarray.Dataset containing raw model data
+        var        - string variable name
+        reg        - string region name
+        masks      - xarray.Dataset of regional masks
+    """
+
+    mask_bool = True
+    if type(masks) == type(True):
+        mask_bool = masks
+    
+    ## get ocean model grid information
+    ocean_grid = xr.open_dataset('/local/projects/so_predict/esm2m_froelicher/GRID/ocean.static.nc')
+    
+    ## get grid-cell area for the ocean only
+    area = xr.where(np.isnan(ds[var][0]), np.nan, ocean_grid['area_t'])
+
+    ## global anomaly
+    if (not mask_bool) and (reg == 'global'):
+        monthly_mean = reg_monthly_mean(ds, var)
+        seasonal_cycle = monthly_mean.groupby('time.month').mean(dim='time')
+        monthly_anom = monthly_mean.groupby('time.year') - seasonal_cycle
+    
+        return annual_anom
+        
+    ## anomaly for each region from masks parameter, returns a list of timeseries
+    ## !! BUGS
+    elif (mask_bool) and (reg == 'all'):
+
+        return annual_anom
+        
+    ## anomaly for a single specified region from masks parameter
+    elif (mask_bool) and (reg != 'global') and (reg != 'all'):
+
         return annual_anom
         
     else:

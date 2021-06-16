@@ -11,23 +11,28 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 
-## generates a timeseries plot of mean [variable] with all regions overlaid
-## needs reg_masks already loaded
-def ctrl_overlay_plot(reg_mean, title, ylabel, reg_masks=False, size=False):
-    ## get masks if necessary
-    if not reg_masks:
-        write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
-        reg_masks = xr.open_dataset(write_rootdir+'regional_global_masks.nc')
+#################################################################################
+#################################################################################
+def ctrl_overlay_plot(reg_mean, title, ylabel, size=(10,5)):
+    """
+    Description:
+        Generates a timeseries plot of the annual mean with all regions overlaid.
     
-    ## figure settings
-    if not size:
-        size = (10,5)
+    Parameters:
+        reg_mean - list of xarray.DataArray objects corresponding to each region
+        title    - string title
+        ylabel   - string y-axis label
+        size     - tuple size of plot
+    """
+    
+    ## get masks
+    write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
+    reg_masks = xr.open_dataset(write_rootdir+'regional_global_masks.nc')
 
     ## axes formatting
-    years = np.arange(1,301,1)
+    time = np.arange(1,reg_mean[0].size+1,1)
     ens_yrs = [22,64,106,170,232,295]
-    xlim = [1,300]
-    size = (10,5)
+    xlim = [1,reg_mean[0].size]
     ls = '-'
     primary_width = 2
     secondary_width = 1
@@ -39,26 +44,38 @@ def ctrl_overlay_plot(reg_mean, title, ylabel, reg_masks=False, size=False):
     fig,ax = plt.subplots(figsize=size)
     
     ## plot all regions
-    ax.plot(years, reg_mean[0], label='Southern Ocean', color=cmap[0], ls=ls, linewidth=primary_width, zorder=6)
+    ax.plot(time, reg_mean[0], label='Southern Ocean', color=cmap[0], ls=ls, linewidth=primary_width, zorder=6)
 
     for (reg, i) in zip(reg_masks.data_vars, range(0,6)):
         if i !=0:
             reg_title = reg_masks[reg].attrs['long_name']
-            ax.plot(years, reg_mean[i], label=reg_title, color=cmap[i], ls=ls, linewidth=secondary_width)
+            ax.plot(time, reg_mean[i], label=reg_title, color=cmap[i], ls=ls, linewidth=secondary_width)
 
     ax.set(title=title, xlabel = 'Time (yr)', ylabel=ylabel, xlim=xlim);
+    
     leg = ax.legend(bbox_to_anchor = (1.02, 1));
     for line in leg.get_lines():
         line.set_linewidth(4.0)
 
 
-## generates individual timeseries plots of mean [variable] for each each region
-## needs reg_masks already loaded
-def ctrl_grid_plot(reg_mean, title, ylabel, reg_masks=False, style='equal'):
-    ## get masks if necessary
-    if not reg_masks:
-        write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
-        reg_masks = xr.open_dataset(write_rootdir+'regional_global_masks.nc')
+#################################################################################
+#################################################################################
+def ctrl_grid_plot(reg_mean, title, ylabel, style='equal'):
+    """
+    Description:
+        Generates a grid of individual plots, each with the annual mean for one
+        region.
+    
+    Parameters:
+        reg_mean - list of xarray.DataArray objects corresponding to each region
+        title    - string title
+        ylabel   - string y-axis label
+        style    - choose the layout of the plots
+    """
+    
+    ## get masks
+    write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
+    reg_masks = xr.open_dataset(write_rootdir+'regional_global_masks.nc')
     
     ## figure settings
     if style == 'center':
@@ -91,9 +108,9 @@ def ctrl_grid_plot(reg_mean, title, ylabel, reg_masks=False, style='equal'):
 
     ## axes settings
     label_loc = 'left'
-    years = np.arange(1,301,1)
+    time = np.arange(1,reg_mean[0].size+1,1)
     ens_yrs = [22,64,106,170,232,295]
-    xlim = [1,300]
+    xlim = [1,reg_mean[0].size]
     size = (10,5)
     ls = '-'
     primary_width = 2
@@ -109,7 +126,7 @@ def ctrl_grid_plot(reg_mean, title, ylabel, reg_masks=False, style='equal'):
     ## plot all regions
     for (reg, i) in zip(reg_masks.data_vars, range(6)):
         reg_title = reg_masks[reg].attrs['long_name']
-        axes[i].plot(years, reg_mean[i], color=cmap[i], ls=ls, linewidth=secondary_width)
+        axes[i].plot(time, reg_mean[i], color=cmap[i], ls=ls, linewidth=secondary_width)
         axes[i].set(xlabel = 'Time (yr)', ylabel=ylabel, xlim=xlim, xticks=ens_yrs)
         axes[i].set_title('('+chr(fignum)+') '+reg_title, loc=label_loc)
         axes[i].autoscale(enable=True,axis='x',tight=True)
