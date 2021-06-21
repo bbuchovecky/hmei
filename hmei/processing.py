@@ -152,8 +152,11 @@ def open_raw_ctrl(var):
 
 #################################################################################
 #################################################################################
-def gridcell_calc(ds, var, metric=False):
+def gridcell_calc(ds, var, metric=False, resize=False):
     da = ds[var]
+    
+    if resize == True:
+        da = SouthernOcean_resize(da, time=True)
     
     if (type(metric) == bool) and (metric == False):            
         clim = da.groupby('time.month').mean(dim='time')
@@ -163,11 +166,17 @@ def gridcell_calc(ds, var, metric=False):
         anom = anom.rename(da.name+'_gridcell_anom')
 
 #         var = anom.var(dim='time') ## single value, variance of all 3600 months
-#         var = anom.groupby('time.month').var(dim='time') ## 12 values, variance for each month
+        var = anom.groupby('time.month').var(dim='time') ## 12 values, variance for each month
         var = var.rename(da.name+'_gridcell_var')
+        var.attrs['description'] = 'variance of each month over the 300 year control simulation'
 
-        metrics = xr.merge([clim, anom, var])
-        metrics.attrs = da.attrs
+        if resize == True:
+            metrics = xr.merge([da, clim, anom, var])
+            metrics.attrs = da.attrs
+            metrics.attrs['region'] = 'latitude <= -40.5 degN'
+        if resize == False:
+            metrics = xr.merge([clim, anom, var])
+            metrics.attrs = da.attrs
         return metrics
     
     elif metric == 'clim':
@@ -185,8 +194,9 @@ def gridcell_calc(ds, var, metric=False):
         clim = da.groupby('time.month').mean(dim='time')
         anom = da.groupby('time.month') - clim
 #         var = anom.var(dim='time') ## single value, variance of all 3600 months
-#         var = anom.groupby('time.month').var(dim='time') ## 12 values, variance for each month
+        var = anom.groupby('time.month').var(dim='time') ## 12 values, variance for each month
         var = var.rename(da.name+'_gridcell_var')
+        var.attrs['description'] = 'variance of each month over the 300 year control simulation'
         return var
 
     else:
@@ -197,10 +207,36 @@ def gridcell_calc(ds, var, metric=False):
 #################################################################################
 #################################################################################
 def save_gridcell_calc(ds, var, write_rootdir, subdir):
-    filename = var.lower()+'_gridcell_metrics.nc'
+    filename = var.lower()+'_so_gridcell_metrics.nc'
     path = write_rootdir+subdir+var.upper()+'/'+filename
     ds.to_netcdf(path)
     print(path)
+
+
+#################################################################################
+#################################################################################
+# Resize DataArray to Southern Ocean region (latitude <= -40.5degN)
+# The Southern Ocean mask is south of -55degN, but this resizing will provide room to play around with latitude bounds.
+# For this model data, `yt_ocean` is equal to `geolat_t` in the Southern Hemisphere, so `yt_ocean` is used to resize the data.
+# The `da` DataArray parameter requires the following coordinates - case sensitive: {'time', 'yt_ocean', 'xt_ocean', 'geolat_t', 'geolon_t'}
+def SouthernOcean_resize(da, time):
+    if time == True:
+        so = da.drop({'time', 'xt_ocean', 'yt_ocean', 'geolon_t', 'geolat_t'})
+        so = so[:,:42].assign_coords({'time':da.time})
+        so = so.assign_coords({'yt_ocean':da.yt_ocean[:42], 'xt_ocean':da.xt_ocean})
+        so = so.assign_coords({'geolon_t':da.geolon_t[:42,:], 'geolat_t':da.geolat_t[:42,:]})
+        
+    elif time == False:
+        so = da.drop({'xt_ocean', 'yt_ocean', 'geolon_t', 'geolat_t'})
+        so = so[:42,:]
+        so = so.assign_coords({'yt_ocean':da.yt_ocean[:42], 'xt_ocean':da.xt_ocean})
+        so = so.assign_coords({'geolon_t':da.geolon_t[:42,:], 'geolat_t':da.geolat_t[:42,:]})
+    
+    else:
+        print('the parameter \'time\' must be a boolean')
+        return
+    
+    return so
     
 
 #################################################################################
@@ -370,4 +406,68 @@ def reg_monthly_anom(ds_mean):
 #################################################################################
 #################################################################################
 def reg_monthly_var(ds_anom):
-    return
+    ## copy and reshape the anomaly dataset
+    ds_var = ds_anom.copy(deep=True)
+    reg = True
+    
+    try:
+        ds_var = ds_var.drop({'month','SouthernOcean','Weddell','Indian',
+                              'WestPacific','Ross','AmundBell'})
+    except:
+        ds_var = ds_var.drop({'month','Global'})
+        reg = False
+    
+    ds_var['month'] = np.arange(1,13)
+    ds_var.attrs['name'] = ds_var.attrs['name'].replace('anom', 'var')
+
+    ## create numpy array for grouping anomaly data by month
+    ## i.e. [ [Jan], [Feb], ..., [Dec]]
+    if reg:
+        np_anom = np.zeros((len(ds_anom.data_vars),12,300))
+        
+        ## group anomaly data by month
+        for (reg,i) in zip(ds_anom.data_vars,range(6)):
+            for m in range(0,3600):           
+                np_anom[i][m%12][int(m/12)] = ds_anom[reg].isel(month=m)
+        
+        ## compute variance
+        np_var = np.var(np_anom, axis=2)
+        if np.shape(np_var) != (6,12):
+            raise Exception('variance array is the wrong shape')
+        
+        ## migrate data from numpy array to dataset
+        for (reg,i) in zip(ds_anom.data_vars, range(6)):
+            ds_var[reg] = (('month'), np_var[i])
+
+    if not reg:
+        np_anom = np.zeros((12,300))
+        
+        ## group anomaly data by month
+        for reg in ds_anom.data_vars:
+            for m in range(0,3600):           
+                np_anom[m%12][int(m/12)] = ds_anom[reg].isel(month=m)
+        
+        ## compute variance
+        np_var = np.var(np_anom, axis=1)
+        if np.shape(np_var) != (12,):
+            raise Exception('variance array is the wrong shape')
+            
+        ## migrate data from numpy array to dataset
+        ds_var['Global'] = (('month'), np_var)
+    
+#     if reg:
+#         np_var = np.var(np_anom, axis=2)
+#         print(np.shape(np_var))
+#         if np.shape(np_var) != (6,12):
+#             raise Exception('variance array is the wrong shape')
+#     if not reg:
+#         np_var = np.var(np_anom)
+#         print(np.shape(np_var))
+#         if np.shape(np_var) != (1,12):
+#             raise Exception('variance array is the wrong shape')
+            
+    ## migrate data from numpy array to dataset
+#     for (reg,i) in zip(ds_anom.data_vars, range(6)):
+#         ds_var[reg] = (('month'), np_var[i])
+    
+    return ds_var
