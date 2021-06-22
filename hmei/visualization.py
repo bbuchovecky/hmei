@@ -146,3 +146,144 @@ def ctrl_grid_plot(reg_mean, title, ylabel, style='equal'):
         axes[i].set_ylim(min_ylim, max_ylim)
 
     fig.suptitle(title, fontsize=16)
+    
+    
+#################################################################################
+#################################################################################
+def grid_month_anom(so_monthly_anom, reg, ylabel='', title='', size=(10,10)):
+    
+    fig,axes = plt.subplots(4, 3, sharey=True, sharex=True, figsize=size)
+
+    months = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+              'August', 'September', 'October', 'November', 'December']
+    ens_yrs = [22,64,106,170,232,295]
+    years = np.arange(1,301)
+    xlim=[0,300]
+    regions = ['SouthernOcean', 'Weddell', 'Indian', 
+               'WestPacific', 'Ross', 'AmundBell']
+    cmap = ['black', 'red', 'blue', 'green', 'orange', 'magenta']
+    iColor = regions.index(reg)
+    month_anom = np.zeros((12,300))
+    
+    max_ylim = float('-inf')
+
+    for m in range(3600):
+        month_anom[m%12,int(m/12)] = so_monthly_anom[reg].isel(month=m)
+
+    for i in range(12):
+        axes[int(i/3),i%3].plot(years, month_anom[i], color=cmap[iColor])
+        axes[int(i/3),i%3].set(title=months[i], xlim=xlim);
+        
+        ## add irregular ticks for ensemble start years
+        axes[int(i/3),i%3].set_xticks(ens_yrs);
+
+        axes[int(i/3),i%3].grid()
+#         axes[int(i/3),i%3].xaxis.grid(True)
+#         axes[int(i/3),i%3].yaxis.grid(True)
+    
+#         axes[int(i/3),i%3].spines['right'].set_color('none')
+#         axes[int(i/3),i%3].spines['top'].set_color('none')
+
+        if int(i/3) == 3:
+            axes[int(i/3),i%3].set(xlabel='Time (yrs)');
+#         if i%3 == 0:
+#             axes[int(i/3),i%3].set(ylabel=so_monthly_anom[reg].attrs['label']);
+        
+        ## make sure y-axis is symmetric
+        this_ylim = axes[int(i/3),i%3].get_ylim()
+        diff = this_ylim[1] - this_ylim[0]
+        diff = math.floor(math.log(diff, 10))
+        if abs(this_ylim[0]) > max_ylim:
+            max_ylim = round(abs(this_ylim[0]), abs(diff)+1)
+        if abs(this_ylim[1]) > max_ylim:
+            max_ylim = round(abs(this_ylim[1]), abs(diff)+1)
+          
+    ## set y-axis limits and plot vertical/horizontal lines
+    for i in range(12):
+        axes[int(i/3),i%3].hlines(0, 1, 300, color='gray', ls='-')
+#         axes[int(i/3),i%3].vlines(ens_yrs, -max_ylim, max_ylim, color='silver', ls='-', linewidth=0.75)
+        axes[int(i/3),i%3].set_ylim(-max_ylim, max_ylim)
+
+    if title == '':
+        fig.suptitle(so_monthly_anom.attrs['name']+' - '+reg, fontsize=16)
+    else:
+        fig.suptitle(title, fontsize=16)
+    
+    fig.tight_layout()
+
+
+#################################################################################
+#################################################################################
+def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
+    write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
+    subdir_ctrl = 'CTRL/'
+    
+    if so_ds[reg].dims[0] == 'year':
+        xlim = [0,300]
+        time = np.arange(1,301)
+        xlabel = 'Time (years)'
+        ens_yrs = [22,64,106,170,232,295]
+        duration = 10
+    if so_ds[reg].dims[0] == 'month':
+        xlim = [0,3600]
+        time = np.arange(1,3601)
+        xlabel = 'Time (months)'
+        ens_yrs = np.array([22,64,106,170,232,295])*12
+        duration = 120
+    
+    reg_masks = xr.open_dataset(write_rootdir+'regional_global_masks.nc')
+    ireg = list(reg_masks.data_vars).index(reg)
+    
+    mean = so_ds[reg].mean()
+    stdev = so_ds[reg].std()
+
+    fig,ax = plt.subplots(figsize=size)
+
+    cmap = ['black', 'red', 'blue', 'green', 'orange', 'magenta']
+
+    ax.plot(time, so_ds[reg], color=cmap[ireg])
+    ax.set(xlim=xlim)
+
+    for yr in ens_yrs:
+        ax.axvspan(yr, yr+duration, alpha=0.25, color='gray')
+    #     ax.axvspan(yr, yr+10, color='gray', fill=False, hatch='xx', alpha=0.5)
+
+    max_sigma = 0
+    while (max_sigma*stdev) <= abs(so_ds[reg]-mean).max():
+        max_sigma += 1
+    
+    stdev_lines = []
+    sigma_labels = []
+    sigma_num = np.arange(0,max_sigma+1)
+    
+    if max_sigma >= 6:
+        sigma_num = np.arange(0,max_sigma+1,2)
+        
+    for s in sigma_num:
+        if s == 0:
+            stdev_lines.append(mean)
+            sigma_labels.append('0')
+        else:
+            stdev_lines.append(mean + (s*stdev))
+            stdev_lines.append(mean - (s*stdev))
+            sigma_labels.insert(0,'-'+str(s)+'$\sigma$')
+            sigma_labels.append('+'+str(s)+'$\sigma$')
+
+    
+    ax.hlines(stdev_lines, xlim[0], xlim[1], color='gray', ls='-.', alpha=0.5)
+    
+    ax2 = ax.twinx()
+    ax2.set(ylim=ax.get_ylim());
+    ax2.set_yticks(sorted(stdev_lines));
+    ax2.set_yticklabels(sigma_labels);
+    
+    ax.set_xlabel(xlabel)
+    
+    if title == '':
+        ax.set_title(so_ds.attrs['name']+' - '+reg)
+    if title != '':
+        ax.set_title(title)
+    if ylabel == '':
+        ax.set_ylabel(so_ds[reg].attrs['label'])
+    if ylabel != '':
+        ax.set_ylabel(ylabel)

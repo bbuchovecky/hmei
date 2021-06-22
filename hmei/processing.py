@@ -110,44 +110,44 @@ def open_raw_ctrl(var):
     
 #################################################################################
 #################################################################################
-# def open_gridcell_ctrl(var, metric=False, reg='global'):
-#     """
-#     Description:
-#         Opens processed grid-cell data (either climatology, anomaly, or variance)
-#         as <xarray.Dataset> objects.
+def open_gridcell_ctrl(var, metric=False, reg='global'):
+    """
+    Description:
+        Opens processed grid-cell data (either climatology, anomaly, or variance)
+        as <xarray.Dataset> objects.
         
-#         path = /home/bbuchovecky/storage/so_predict_derived/CTRL/[VAR].
+        path = /home/bbuchovecky/storage/so_predict_derived/CTRL/[VAR].
     
-#     Parameters:
-#         var    - string variable name
-#         metric - 'climatology', 'anomaly', 'variance'
-#                  (or False for SIE and SIV)
-#         reg    - 'global', 'so', 'southernocean'
-#                  (or False for global, True for Southern Ocean)
-#     """
+    Parameters:
+        var    - string variable name
+        metric - 'climatology', 'anomaly', 'variance'
+                 (or False for SIE and SIV)
+        reg    - 'global', 'so', 'southernocean'
+                 (or False for global, True for Southern Ocean)
+    """
     
-#     write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
-#     subdir_ctrl = 'CTRL/'
+    write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
+    subdir_ctrl = 'CTRL/'
     
-#     if reg == 'global':
-#         if (var.lower() == 'sie') or (var.lower() == 'siv'):
-#             filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_timeseries.nc'
-#         else:
-#             filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_global_'+metric.lower()+'.nc'
-#         print(filename)
-#         return xr.open_dataset(filename)
+    if reg == 'global':
+        if (var.lower() == 'sie') or (var.lower() == 'siv'):
+            filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_timeseries.nc'
+        else:
+            filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_global_'+metric.lower()+'.nc'
+        print(filename)
+        return xr.open_dataset(filename)
     
-#     elif (reg.lower() == 'so') or (reg.lower() == 'southernocean'):
-#         if (var.lower() == 'sie') or (var.lower() == 'siv'):
-#             filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_timeseries.nc'
-#         else:
-#             filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_'+metric.lower()+'.nc'
-#         print(filename)
-#         return xr.open_dataset(filename)
+    elif (reg.lower() == 'so') or (reg.lower() == 'southernocean'):
+        if (var.lower() == 'sie') or (var.lower() == 'siv'):
+            filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_timeseries.nc'
+        else:
+            filename = write_rootdir+subdir_ctrl+var.upper()+'/'+var.lower()+'_ctrl_so_'+metric.lower()+'.nc'
+        print(filename)
+        return xr.open_dataset(filename)
     
-#     else:
-#         print('<invalid parameters>')
-#         return
+    else:
+        print('<invalid parameters>')
+        return
 
 
 #################################################################################
