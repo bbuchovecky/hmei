@@ -271,6 +271,7 @@ def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
 
     
     ax.hlines(stdev_lines, xlim[0], xlim[1], color='gray', ls='-.', alpha=0.5)
+#     ax.hlines(mean, xlim[0], xlim[1], color='gray', ls='-', alpha=0.75)
     
     ax2 = ax.twinx()
     ax2.set(ylim=ax.get_ylim());
@@ -280,10 +281,12 @@ def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
     ax.set_xlabel(xlabel)
     
     if title == '':
-        ax.set_title(so_ds.attrs['name']+' - '+reg)
+        ax.set_title(so_ds.attrs['name'].rstrip('.nc')+' - '+reg)
     if title != '':
         ax.set_title(title)
     if ylabel == '':
         ax.set_ylabel(so_ds[reg].attrs['label'])
     if ylabel != '':
         ax.set_ylabel(ylabel)
+        
+    return fig,ax

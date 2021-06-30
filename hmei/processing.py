@@ -318,7 +318,7 @@ def reg_annual_anom(ds, var, masks=False, reg='global'):
         annual_mean = reg_annual_mean(ds, var)
         single_mean = annual_mean.mean(dim='year')
         annual_anom = annual_mean - single_mean
-        annual_anom.name = annual_anom.name.removesuffix('annual_mean') + 'yearly_anomaly'
+        annual_anom.name = annual_anom.name.removesuffix('annual_mean') + 'annual_anomaly'
         return annual_anom
         
     ## anomaly for a single specified region from masks parameter
@@ -326,7 +326,7 @@ def reg_annual_anom(ds, var, masks=False, reg='global'):
         annual_mean = reg_annual_mean(ds, var, masks, reg)
         single_mean = annual_mean.mean(dim='year')
         annual_anom = annual_mean - single_mean
-        annual_anom.name = anom.name.removesuffix('annual_mean') + 'yearly_anomaly'
+        annual_anom.name = anom.name.removesuffix('annual_mean') + 'annual_anomaly'
         return annual_anom
         
     else:
