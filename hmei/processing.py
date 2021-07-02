@@ -268,7 +268,10 @@ def reg_annual_mean(ds, var, masks=False, reg='global'):
     if (not mask_bool) and (reg == 'global'):
         area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
         global_var = ds[var]
-        annual_mean = (global_var * ocean_grid['area_t']).groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
+        if var == 'SIE_area' or var == 'SIV_area':
+            annual_mean = global_var.groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}).groupby('time.year').mean(dim='time')
+        else:
+            annual_mean = (global_var * ocean_grid['area_t']).groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
         annual_mean.name = 'Global'
         annual_mean = annual_mean.to_dataset()
         annual_mean.attrs['name'] = var.lower() + '_global_annual_mean'
@@ -279,7 +282,10 @@ def reg_annual_mean(ds, var, masks=False, reg='global'):
         area = area.where(masks[reg] == 1)
         area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
         reg_var = ds[var].where(masks[reg] == 1)
-        annual_mean = (reg_var * ocean_grid['area_t']).groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
+        if var == 'SIE_area' or var == 'SIV_area':
+            annual_mean = reg_var.groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'})
+        else:
+            annual_mean = (reg_var * ocean_grid['area_t']).groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
         annual_mean.name = reg + '_' + var + '_annual_mean'
         return annual_mean
     
