@@ -244,12 +244,13 @@ def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
     ax.plot(time, so_ds[reg], color=cmap[ireg])
     ax.set(xlim=xlim)
 
-    for yr in ens_yrs:
-        if yr == 22:
-            ax.axvspan(yr, yr+duration, alpha=0.25, color='gray', label='Ensemble Runs')
-        else:
-            ax.axvspan(yr, yr+duration, alpha=0.25, color='gray')
-    #     ax.axvspan(yr, yr+10, color='gray', fill=False, hatch='xx', alpha=0.5)
+#     for yr in ens_yrs:
+#         if yr == 22:
+#             ax.axvspan(yr, yr+duration, alpha=0.25, color='gray', label='Ensemble Runs')
+#         else:
+#             ax.axvspan(yr, yr+duration, alpha=0.25, color='gray')
+# #         ax.axvspan(yr, yr+10, color='gray', fill=False, hatch='xx', alpha=0.5)
+#     ax.legend(loc='upper left')
 
     max_sigma = 0
     while (max_sigma*stdev) <= abs(so_ds[reg]-mean).max():
@@ -291,7 +292,5 @@ def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
         ax.set_ylabel(so_ds[reg].attrs['label'])
     if ylabel != '':
         ax.set_ylabel(ylabel)
-        
-    ax.legend(loc='upper left')
         
     return fig,ax
