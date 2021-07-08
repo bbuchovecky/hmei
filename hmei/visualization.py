@@ -13,7 +13,8 @@ import matplotlib.gridspec as gridspec
 
 #################################################################################
 #################################################################################
-def ctrl_overlay_plot(reg_mean, title, ylabel, size=(10,5)):
+def ctrl_overlay_plot(
+    reg_mean, title, ylabel, size=(10,5)):
     """
     Description:
         Generates a timeseries plot of the annual mean with all regions overlaid.
@@ -60,7 +61,8 @@ def ctrl_overlay_plot(reg_mean, title, ylabel, size=(10,5)):
 
 #################################################################################
 #################################################################################
-def ctrl_grid_plot(reg_mean, title, ylabel, style='equal'):
+def ctrl_grid_plot(
+    reg_mean, title, ylabel, style='equal'):
     """
     Description:
         Generates a grid of individual plots, each with the annual mean for one
@@ -150,7 +152,8 @@ def ctrl_grid_plot(reg_mean, title, ylabel, style='equal'):
     
 #################################################################################
 #################################################################################
-def grid_month_anom(so_monthly_anom, reg, ylabel='', title='', size=(10,10)):
+def grid_month_anom(
+    so_monthly_anom, reg, ylabel='', title='', size=(10,10)):
     
     fig,axes = plt.subplots(4, 3, sharey=True, sharex=True, figsize=size)
 
@@ -214,7 +217,9 @@ def grid_month_anom(so_monthly_anom, reg, ylabel='', title='', size=(10,10)):
 
 #################################################################################
 #################################################################################
-def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
+def stdev_plot(
+    so_ds, reg, title='', ylabel='', size=(10,5)):
+    
     write_rootdir = '/home/bbuchovecky/storage/so_predict_derived/'
     subdir_ctrl = 'CTRL/'
     
@@ -294,3 +299,703 @@ def stdev_plot(so_ds, reg, title='', ylabel='', size=(10,5)):
         ax.set_ylabel(ylabel)
         
     return fig,ax
+
+#################################################################################
+#################################################################################
+def open_ppp(
+    var, reg, timescale='monthly'):
+    
+    writedir = '/home/bbuchovecky/storage/so_predict_derived/'
+    subdir = 'PPP/'+var.upper()+'/'
+    filename = var.lower()+'_ts_'+reg+'_'+timescale+'_ppp.nc'
+    return xr.open_dataset(writedir+subdir+filename)
+
+#################################################################################
+#################################################################################
+
+def format_ppp_axes(
+    ax, timescale='monthly', summer_span=True, threshold=0.183, ymin=-0.2, ppp=None):
+    
+    if timescale == 'monthly':
+        ax.hlines(threshold, 0, 121, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+        ax.set_xlim(1,120)
+        
+    if timescale == 'annual':
+        ax.hlines(threshold, 0, 11, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+        ax.set_ylim(1,10)
+        
+    ax.set_ylim(ymin, 1.0)
+    if ppp != None:
+        if ppp.min() < 0:
+            ax.set_ylim(round(ppp.min().values-0.0, 1)-0.1, 1.0)
+        if ppp.min() > 0:
+            ax.set_ylim(0.0,1.0)
+    
+    if summer_span and timescale == 'monthly':
+        for m in np.arange(-1,120,12):
+            if m < 0:
+                ax.axvspan(m, m+4, alpha=0.25, color='gray', label='Months DJFM')
+            else:
+                ax.axvspan(m, m+4, alpha=0.25, color='gray')
+    
+    ## set xticks and labels
+    yrs = np.array([2,4,6,8,10])
+    if timescale == 'monthly':
+        ax.set_xticks(yrs*12)
+    ax.set_xticklabels(yrs)
+    
+    return ax
+
+#################################################################################
+#################################################################################
+
+def plot_ppp(
+    var, reg, so_reg='SouthernOcean', timescale='monthly', summer_span=True, threshold=0.183, figsize=(10,5), leg_loc='upper right'):
+    
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 
+                         'cn_inv':'SIC', 'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent',
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity', 
+                         'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 
+                         'sie':'Sea ice extent', 'sst':'Sea surface temperature', 'sss':'Sea surface salinity',
+                         'cn_inv':'Sea ice concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+        
+    if type(var) == str and type(so_reg) == str:
+        fig,ax = plt.subplots(figsize=figsize)
+        
+        if reg == 'global':
+            title = 'Global '+var_lu_names[var.lower()]
+            r = 'Global'
+
+        if reg == 'so':
+            title = reg_names[so_reg]+' '+var_lu_names[var.lower()]
+            r = so_reg
+        
+        ppp = open_ppp(var, reg, timescale)
+        ax.plot(ppp['nT'], ppp[r], color='red', label=var_su_names[var])
+
+        ax = format_ppp_axes(ax, timescale=timescale, summer_span=summer_span, threshold=threshold)
+        
+        
+    if type(var) == list and type(so_reg) == str:
+        fig,ax = plt.subplots(figsize=figsize)
+        
+        if reg == 'global':
+            title = 'Global'
+            r = 'Global'
+
+        if reg == 'so':
+            title = reg_names[so_reg]
+            r = so_reg
+        
+        for v in var:
+            ppp = open_ppp(v, reg, timescale)
+            ax.plot(ppp['nT'], ppp[r], color=var_colors[v], label=var_su_names[v.lower()])
+        
+        ax = format_ppp_axes(ax, timescale=timescale, summer_span=summer_span, threshold=threshold)
+        
+    if type(so_reg) == list and type(var) == str:
+        fig,ax = plt.subplots(figsize=figsize)
+        
+        ppp = open_ppp(var, reg, timescale)
+        for r in so_reg:
+            ax.plot(ppp['nT'], ppp[r], color=reg_colors[r], label=reg_names[r])
+
+        title = var_lu_names[var]
+        
+        ax = format_ppp_axes(ax, timescale=timescale, summer_span=summer_span, threshold=threshold)
+
+    ax.set_xlabel('Lead time (yr)')
+    ax.set_ylabel('PPP')
+    ax.set_title(title)
+    
+    ## set up legend
+    leg = ax.legend(loc=leg_loc);
+    for line in leg.get_lines():
+        line.set_linewidth(2.0)
+        line.set_linestyle(line.get_linestyle())
+        
+    return fig,ax
+
+#################################################################################
+#################################################################################
+
+def ppp_var_grid(
+    reg, timescale='monthly', summer_span=True, ylim=None, threshold=0.183, leg_loc='outside', figsize=(13,10)):
+    
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 
+                         'cn_inv':'SIC', 'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent',
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity', 
+                         'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 
+                         'sie':'Sea ice extent', 'sst':'Sea surface temperature', 'sss':'Sea surface salinity',
+                         'cn_inv':'Sea ice concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+    
+    variables = ['sst', 'sss', 'npp', 'mld', 'pco2surf', 'cn_inv', 'sie', 'siv']
+
+    fig,axes = plt.subplots(4, 2, figsize=figsize, sharex=True)
+
+    min_ylim = float('inf')
+    for (i,var) in zip(range(8), variables):
+        if type(reg) == str:
+            ppp = open_ppp(var, 'so')[reg]
+
+            axes[int(i/2),i%2].plot(ppp['nT'], ppp, color=var_colors[var])
+            axes[int(i/2),i%2] = format_ppp_axes(axes[int(i/2),i%2], timescale=timescale, summer_span=summer_span, threshold=threshold)
+            axes[int(i/2),i%2].set_title(var_su_names[var.lower()])
+
+            if axes[int(i/2),i%2].get_ylim()[0] < min_ylim:
+                min_ylim = axes[int(i/2),i%2].get_ylim()[0]
+
+            if int(i/2) == 3:
+                axes[int(i/2),i%2].set_xlabel('Lead time (yr)')
+
+            if i%2 == 0:
+                axes[int(i/2),i%2].set_ylabel('PPP')
+                
+        if type(reg) == list:
+            for r in reg:
+                ppp = open_ppp(var, 'so')[r]
+
+                axes[int(i/2),i%2].plot(ppp['nT'], ppp, color=reg_colors[r], label=reg_names[r])
+
+                if axes[int(i/2),i%2].get_ylim()[0] < min_ylim:
+                    min_ylim = axes[int(i/2),i%2].get_ylim()[0]
+                    
+            axes[int(i/2),i%2] = format_ppp_axes(axes[int(i/2),i%2], timescale=timescale, summer_span=summer_span, threshold=threshold)
+            axes[int(i/2),i%2].set_title(var_su_names[var.lower()])
+
+            if int(i/2) == 3:
+                axes[int(i/2),i%2].set_xlabel('Lead time (yr)')
+
+            if i%2 == 0:
+                axes[int(i/2),i%2].set_ylabel('PPP')
+
+    if ylim == 'same':
+        for i in range(8):
+            axes[int(i/2),i%2].set_ylim(min_ylim, 1.0)
+
+    if leg_loc == 'outside':
+        leg = axes[0,1].legend(bbox_to_anchor = (1.02, 1));
+    if leg_loc != 'outside':
+        leg = axes[0,1].legend(loc=leg_loc);
+    for line in leg.get_lines():
+        line.set_linewidth(2.0)
+        line.set_linestyle(line.get_linestyle())
+
+    if type(reg) == str:
+        fig.suptitle(reg_names[reg]+' PPP', fontsize=16)
+    if type(reg) == list:
+        fig.suptitle('Regional PPP', fontsize=16)
+    fig.tight_layout()
+    
+    return fig,axes
+
+#################################################################################
+#################################################################################
+
+def ppp_reg_grid(
+    var, timescale='monthly', summer_span=True, ylim=None, threshold=0.183, leg_loc='outside', figsize=(13,8)):
+    
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 
+                         'cn_inv':'SIC', 'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent',
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity', 
+                         'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 
+                         'sie':'Sea ice extent', 'sst':'Sea surface temperature', 'sss':'Sea surface salinity',
+                         'cn_inv':'Sea ice concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+    
+    regions = ['SouthernOcean', 'Weddell', 'Indian', 'WestPacific', 'Ross', 'AmundBell']
+    
+    fig,axes = plt.subplots(3, 2, figsize=figsize, sharex=True)
+
+    min_ylim = float('inf')
+    for (i,reg) in zip(range(6), regions):
+        if type(var) == str:    
+            ppp = open_ppp(var, 'so')[reg]
+
+            axes[int(i/2),i%2].plot(ppp['nT'], ppp, color=reg_colors[reg])
+            axes[int(i/2),i%2] = format_ppp_axes(axes[int(i/2),i%2], timescale=timescale, summer_span=summer_span, threshold=threshold)
+            axes[int(i/2),i%2].set_title(reg_names[reg])
+
+            if axes[int(i/2),i%2].get_ylim()[0] < min_ylim:
+                min_ylim = axes[int(i/2),i%2].get_ylim()[0]
+
+            if int(i/2) == 2:
+                axes[int(i/2),i%2].set_xlabel('Lead time (yr)')
+
+            if i%2 == 0:
+                axes[int(i/2),i%2].set_ylabel('PPP')
+                
+        if type(var) == list:
+            for v in var:
+                ppp = open_ppp(v, 'so')[reg]
+
+                axes[int(i/2),i%2].plot(ppp['nT'], ppp, color=var_colors[v], label=var_su_names[v])
+
+                if axes[int(i/2),i%2].get_ylim()[0] < min_ylim:
+                    min_ylim = axes[int(i/2),i%2].get_ylim()[0]
+
+            axes[int(i/2),i%2] = format_ppp_axes(axes[int(i/2),i%2], timescale=timescale, summer_span=summer_span, threshold=threshold)
+            axes[int(i/2),i%2].set_title(reg_names[reg])
+            
+            if int(i/2) == 2:
+                axes[int(i/2),i%2].set_xlabel('Lead time (yr)')
+
+            if i%2 == 0:
+                axes[int(i/2),i%2].set_ylabel('PPP')
+
+    if ylim == 'same':
+        for i in range(6):
+            axes[int(i/2),i%2].set_ylim(min_ylim, 1.0)
+
+    if leg_loc == 'outside':
+        leg = axes[0,1].legend(bbox_to_anchor = (1.02, 1));
+    if leg_loc != 'outside':
+        leg = axes[0,1].legend(loc=leg_loc);
+    for line in leg.get_lines():
+        line.set_linewidth(2.0)
+        line.set_linestyle(line.get_linestyle())
+            
+    if type(var) == str:
+        fig.suptitle(var_lu_names[var.lower()]+' PPP', fontsize=16)
+    if type(var) == list:
+        fig.suptitle('Regional PPP', fontsize=16)
+    fig.tight_layout()
+    
+    return fig,axes
+
+#################################################################################
+#################################################################################
+
+def ppp_grid(
+    variables, regions=['SouthernOcean', 'Weddell', 'Indian', 'WestPacific', 'Ross', 'AmundBell']):
+    
+    cols = len(regions)
+    rows = len(variables)
+
+    fig,axes = plt.subplots(rows, cols, figsize=(17,2*rows), sharex=True, sharey=True)
+
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 
+                         'cn_inv':'SIC', 'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent',
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity', 
+                         'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 
+                         'sie':'Sea ice extent', 'sst':'Sea surface temperature', 'sss':'Sea surface salinity',
+                         'cn_inv':'Sea ice concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+
+    ls = ['solid', 'dashed', 'dashdot', 'dotted']
+
+    for (ireg, reg) in zip(range(cols), regions):
+
+        for (ivar, var) in zip(range(rows), variables):
+
+            ppp = open_ppp(var, 'so')[reg]
+
+            axes[ivar, ireg].plot(ppp['nT'], ppp, color=var_colors[var])
+
+            axes[ivar, ireg] = format_ppp_axes(axes[ivar, ireg], summer_span=False)
+            axes[ivar, ireg].set(ylabel='', ylim=[-0.2,1])
+
+            if ivar == 0:
+                axes[ivar, ireg].set_title(reg_names[reg], fontweight='bold', fontsize=14)
+
+            if ireg == 0:
+                axes[ivar, ireg].set_ylabel(var_su_names[var.lower()], fontweight='bold', fontsize=14)
+
+            if ivar == rows-1:
+                axes[ivar, ireg].set_xlabel('Lead time (yr)')
+
+    fig.suptitle('PPP in the Southern Ocean', fontsize=16, y=1.001)
+    fig.tight_layout()
+    
+    
+#################################################################################
+#################################################################################
+    
+def plot_clim(var, reg, so_reg='SouthernOcean', leg_loc='outside', figsize=(10,5)):
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 'cn_inv':'SIC', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent', 
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity',
+                       'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 'sie':'Sea ice extent', 
+                         'sst':'Sea surface temperature', 'sss':'Sea surface salinity','cn_inv':'Sea ice concentration', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+    var_units = dict({'npp':'mol C m$^{-2}$ s$^{-1}$', 'mld':'m', 'sie':'m$^2$', 'sst':'$^\circ$C', 
+                      'sss':'psu', 'cn_inv':'%', 'pco2surf':'uatm', 'siv':'m$^3$'})
+    
+    writedir = '/home/bbuchovecky/storage/so_predict_derived/CTRL/'
+    
+    fig,ax = plt.subplots(figsize=figsize)
+    month_ticks = np.arange(1,13)
+    var = var.lower()
+    ls = '-'
+    
+    if type(var) == list:
+        assert len(var) <= 2, '\'var\' length is too long'
+    
+    if type(var) == str and type(so_reg) == str and so_reg != 'all':
+        subdir = var.upper()+'/'
+        filename = var.lower()+'_ts_'+reg+'_clim.nc'
+        ds = xr.open_dataset(writedir+subdir+filename)
+        
+        if var == 'cn_inv':
+            ds = ds*100
+        
+        if reg == 'global':
+            clim = ds['Global']
+            title = 'Global '+var_lu_names[var]+' Climatology'
+        if reg == 'so':
+            clim = ds[so_reg]
+            title = reg_names[so_reg]+' '+var_su_names[var]+' Climatology'
+            if so_reg == 'SouthernOcean':
+                    ls = '-.'
+            else:
+                ls = '-'
+            
+        ax.plot(month_ticks, clim, color=var_colors[var], ls=ls)
+        
+        ax.set_title(title)
+        ax.set_ylabel(var_su_names[var]+' ('+var_units[var]+')')
+    
+    if type(var) == list and type(so_reg) == str:
+        for v in var:
+            subdir = v.upper()+'/'
+            filename = v.lower()+'_ts_'+reg+'_clim.nc'
+            ds = xr.open_dataset(writedir+subdir+filename)
+            
+            if v == 'cn_inv':
+                ds = ds*100
+            
+            if reg == 'global':
+                clim = ds['Global']
+            if reg == 'so':
+                clim = ds[so_reg]
+                if so_reg == 'SouthernOcean':
+                    ls = '-.'
+                else:
+                    ls = '-'
+            
+            if var.index(v) == 0:
+                ax.plot(month_ticks, clim, color=var_colors[v], label=var_su_names[v], ls=ls)
+                ax.set_ylabel(var_su_names[v]+' ('+var_units[v]+')')
+            
+            if var.index(v) == 1:
+                twinax = ax.twinx()
+                twinax.plot(month_ticks, clim, color=var_colors[v], label=var_su_names[v], ls=ls)
+                twinax.set_ylabel(var_su_names[v]+' ('+var_units[v]+')')
+            
+        ax.set_title(reg_names[so_reg]+' Climatology')        
+        ax.legend(bbox_to_anchor = (1.04,1))
+        twinax.legend(bbox_to_anchor = (1.15,0.91))
+        
+    if (type(so_reg) == list or so_reg == 'all') and type(var) == str:
+        subdir = var.upper()+'/'
+        filename = var.lower()+'_ts_'+reg+'_clim.nc'
+        ds = xr.open_dataset(writedir+subdir+filename)
+        
+        if var == 'cn_inv':
+            ds = ds*100
+        
+        if so_reg == 'all':
+            so_reg = ['SouthernOcean', 'Weddell', 'Indian', 'WestPacific', 'Ross', 'AmundBell']
+        
+        for r in so_reg:
+            clim = ds[r]
+            if r == 'SouthernOcean':
+                    ls = '-.'
+            else:
+                ls = '-'
+            ax.plot(month_ticks, clim, color=reg_colors[r], label=reg_names[r], ls=ls)
+            
+        if leg_loc == 'outside':
+            leg = ax.legend(bbox_to_anchor = (1.02,1))
+        if leg_loc != 'outside':
+            leg = ax.legend(loc=leg_loc)
+        for line in leg.get_lines():
+            line.set_linewidth(2.0)
+            line.set_linestyle(line.get_linestyle())
+            
+        ax.set_title(var_lu_names[var]+' Climatology')
+        ax.set_ylabel(var_su_names[var]+' ('+var_units[var]+')')
+            
+    ax.set_xticks(month_ticks)
+    ax.set_xticklabels(ds['abbrv_month'].values)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(45)
+    
+    ax.set_xlim(1,12)
+            
+    return fig,ax
+
+
+#################################################################################
+#################################################################################
+
+def plot_grid_clim(
+    figsize=(12,7)):
+    
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 'cn_inv':'SIC', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent', 
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity',
+                       'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 'sie':'Sea ice extent', 
+                         'sst':'Sea surface temperature', 'sss':'Sea surface salinity','cn_inv':'Sea ice concentration', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+    var_units = dict({'npp':'mol C m$^{-2}$ s$^{-1}$', 'mld':'m', 'sie':'m$^2$', 'sst':'$^\circ$C', 
+                      'sss':'psu', 'cn_inv':'%', 'pco2surf':'uatm', 'siv':'m$^3$'})
+    
+    variables = ['sst', 'sss', 'npp', 'mld', 'pco2surf', 'cn_inv', 'sie', 'siv']
+    regions=['SouthernOcean', 'Weddell', 'Indian', 'WestPacific', 'Ross', 'AmundBell']
+    
+    writedir = '/home/bbuchovecky/storage/so_predict_derived/CTRL/'
+    
+    fig,axes = plt.subplots(2, 4, figsize=figsize, sharex=True)
+    month_ticks = np.arange(1,13)
+    
+    for (iv,v) in zip(range(len(variables)), variables):
+        subdir = v.upper()+'/'
+        filename = v.lower()+'_ts_so_clim.nc'
+        clim = xr.open_dataset(writedir+subdir+filename)
+        
+        if v == 'cn_inv':
+            clim = clim*100
+        
+        for (ir,r) in zip(range(len(regions)), regions):   
+            if r == 'SouthernOcean':
+                axes[int(iv/4),iv%4].plot(month_ticks, clim[r], label=reg_names[r], color=reg_colors[r], ls='-.')
+            else:
+                axes[int(iv/4),iv%4].plot(month_ticks, clim[r], label=reg_names[r], color=reg_colors[r])
+            
+        axes[int(iv/4),iv%4].set_title(var_su_names[v])
+        axes[int(iv/4),iv%4].set_ylabel(var_su_names[v]+' ('+var_units[v]+')')
+        axes[int(iv/4),iv%4].set_xlim(1,12)
+        
+        if int(iv/4) == 1:
+            axes[int(iv/4),iv%4].set_xticks(month_ticks[::2])
+            axes[int(iv/4),iv%4].set_xticklabels(clim['abbrv_month'].values[::2])
+            for tick in axes[int(iv/4),iv%4].get_xticklabels():
+                tick.set_rotation(45)
+    
+    leg = axes[1,3].legend(bbox_to_anchor=(0.95, -0.25));
+    for line in leg.get_lines():
+        line.set_linewidth(2.0)
+        line.set_linestyle(line.get_linestyle())
+    
+    fig.suptitle('Climatology', fontsize=16)
+    fig.tight_layout()
+
+
+#################################################################################
+#################################################################################   
+    
+def plot_ppp_szncycle(
+    var, reg, so_reg='SouthernOcean', threshold=0.183, leg_loc='upper right', figsize=(10,5)):
+        
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 'cn_inv':'SIC', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent', 
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity',
+                       'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 'sie':'Sea ice extent', 
+                         'sst':'Sea surface temperature', 'sss':'Sea surface salinity','cn_inv':'Sea ice concentration', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+    var_units = dict({'npp':'mol C m$^{-2}$ s$^{-1}$', 'mld':'m', 'sie':'m$^2$', 'sst':'$^\circ$C', 
+                      'sss':'psu', 'cn_inv':'%', 'pco2surf':'uatm', 'siv':'m$^3$'})
+    
+    writedir = '/home/bbuchovecky/storage/so_predict_derived/PPP/'
+    
+    fig,ax = plt.subplots(figsize=figsize)
+    month_ticks = np.arange(1,13)
+    ls = '-'
+    
+    if type(var) == str and type(so_reg) == str and so_reg != 'all':
+        subdir = var.upper()+'/'
+        filename = var.lower()+'_ts_'+reg+'_szncycle_ppp.nc'
+        ds = xr.open_dataset(writedir+subdir+filename)
+        
+        if var == 'cn_inv':
+            ds = ds*100
+        
+        if reg == 'global':
+            clim = ds['Global']
+            title = 'Global '+var_lu_names[var]+' PPP Seasonal Cycle'
+        if reg == 'so':
+            clim = ds[so_reg]
+            title = reg_names[so_reg]+' '+var_su_names[var]+' PPP Seasonal Cycle'
+            
+        ax.plot(month_ticks, clim, color=var_colors[var], ls=ls)
+        
+        ax.set_title(title)
+        ax.set_ylabel('PPP')
+    
+    if type(var) == list and type(so_reg) == str:
+        for v in var:
+            subdir = v.upper()+'/'
+            filename = v.lower()+'_ts_'+reg+'_szncycle_ppp.nc'
+            ds = xr.open_dataset(writedir+subdir+filename)
+            
+            if v == 'cn_inv':
+                ds = ds*100
+            
+            if reg == 'global':
+                clim = ds['Global']
+            if reg == 'so':
+                clim = ds[so_reg]
+            
+            ax.plot(month_ticks, clim, color=var_colors[v], label=var_su_names[v], ls=ls)
+            ax.set_ylabel('PPP')
+            
+        ax.set_title(reg_names[so_reg]+' PPP Seasonal Cycle')        
+        ax.legend(loc=leg_loc)
+        
+    if (type(so_reg) == list or so_reg == 'all') and type(var) == str:
+        subdir = var.upper()+'/'
+        filename = var.lower()+'_ts_'+reg+'_szncycle_ppp.nc'
+        ds = xr.open_dataset(writedir+subdir+filename)
+        
+        if so_reg == 'all':
+            so_reg = ['SouthernOcean', 'Weddell', 'Indian', 'WestPacific', 'Ross', 'AmundBell']
+        
+        for r in so_reg:
+            clim = ds[r]
+            ax.plot(month_ticks, clim, color=reg_colors[r], label=reg_names[r], ls=ls)
+            
+        if leg_loc == 'outside':
+            leg = ax.legend(bbox_to_anchor = (1.02,1))
+        if leg_loc != 'outside':
+            leg = ax.legend(loc=leg_loc)
+        for line in leg.get_lines():
+            line.set_linewidth(2.0)
+            line.set_linestyle(line.get_linestyle())
+            
+        ax.set_title(var_lu_names[var]+' PPP Seasonal Cycle')
+        ax.set_ylabel('PPP')
+            
+    ax.set_xticks(month_ticks)
+    ax.set_xticklabels(ds['abbrv_month'].values)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(45)
+    
+    if threshold != None:
+        ax.hlines(threshold, 0, 13, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+    ax.set_xlim(1,12)
+    ax.set_ylim(-0.2, 1.0)
+    
+    fig.tight_layout()
+            
+    return fig,ax
+
+
+#################################################################################
+################################################################################# 
+
+def plot_grid_ppp_szncycle(
+    threshold=0.183, figsize=(12,7)):
+    
+    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
+                       'Ross':'orange', 'AmundBell':'magenta'})
+    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
+                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
+
+    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
+                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
+    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 'cn_inv':'SIC', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
+    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent', 
+                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity',
+                       'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
+    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 'sie':'Sea ice extent', 
+                         'sst':'Sea surface temperature', 'sss':'Sea surface salinity','cn_inv':'Sea ice concentration', 
+                         'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
+    var_units = dict({'npp':'mol C m$^{-2}$ s$^{-1}$', 'mld':'m', 'sie':'m$^2$', 'sst':'$^\circ$C', 
+                      'sss':'psu', 'cn_inv':'%', 'pco2surf':'uatm', 'siv':'m$^3$'})
+    
+    variables = ['sst', 'sss', 'npp', 'mld', 'pco2surf', 'cn_inv', 'sie', 'siv']
+    regions=['SouthernOcean', 'Weddell', 'Indian', 'WestPacific', 'Ross', 'AmundBell']
+    
+    writedir = '/home/bbuchovecky/storage/so_predict_derived/PPP/'
+    
+    fig,axes = plt.subplots(2, 4, figsize=figsize, sharex=True)
+    month_ticks = np.arange(1,13)
+    
+    for (iv,v) in zip(range(len(variables)), variables):
+        subdir = v.upper()+'/'
+        filename = v.lower()+'_ts_so_szncycle_ppp.nc'
+        clim = xr.open_dataset(writedir+subdir+filename)
+        
+        for (ir,r) in zip(range(len(regions)), regions):   
+            axes[int(iv/4),iv%4].plot(month_ticks, clim[r], label=reg_names[r], color=reg_colors[r])
+        
+        if threshold != None:
+            axes[int(iv/4),iv%4].hlines(threshold, 0, 13, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+        
+        axes[int(iv/4),iv%4].set_title(var_su_names[v])
+        axes[int(iv/4),iv%4].set_ylabel('PPP')
+        axes[int(iv/4),iv%4].set_xlim(1,12)
+        axes[int(iv/4),iv%4].set_ylim(-0.2, 1.0)
+        
+        if int(iv/4) == 1:
+            axes[int(iv/4),iv%4].set_xticks(month_ticks[::2])
+            axes[int(iv/4),iv%4].set_xticklabels(clim['abbrv_month'].values[::2])
+            for tick in axes[int(iv/4),iv%4].get_xticklabels():
+                tick.set_rotation(45)
+    
+    leg = axes[1,3].legend(bbox_to_anchor=(0.95, -0.25));
+    for line in leg.get_lines():
+        line.set_linewidth(2.0)
+        line.set_linestyle(line.get_linestyle())
+    
+    fig.suptitle('PPP Seasonal Cycle', fontsize=16)
+    fig.tight_layout()
