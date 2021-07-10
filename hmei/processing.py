@@ -157,68 +157,31 @@ def open_gridcell_ctrl(
 #################################################################################
 #################################################################################
 def gridcell_calc(
-    ds, var, metric=False, resize=False):
+    ds, var, metric, resize=False, save=False):
     
     da = ds[var]
     
     if resize == True:
         da = SouthernOcean_resize(da, time=True)
-    
-    if (type(metric) == bool) and (metric == False):            
+
+    if metric == 'clim':
         clim = da.groupby('time.month').mean(dim='time')
-        clim = clim.rename(da.name+'_gridcell_clim')
-
-        anom = da.groupby('time.month') - clim
-        anom = anom.rename(da.name+'_gridcell_anom')
-
-#         var = anom.var(dim='time') ## single value, variance of all 3600 months
-        var = anom.groupby('time.month').var(dim='time') ## 12 values, variance for each month
-        var = var.rename(da.name+'_gridcell_var')
-        var.attrs['description'] = 'variance of each month over the 300 year control simulation'
-
-        if resize == True:
-            metrics = xr.merge([da, clim, anom, var])
-            metrics.attrs = da.attrs
-            metrics.attrs['region'] = 'latitude <= -40.5 degN'
-        if resize == False:
-            metrics = xr.merge([clim, anom, var])
-            metrics.attrs = da.attrs
-        return metrics
-    
-    elif metric == 'clim':
-        clim = da.groupby('time.month').mean(dim='time')
-        clim = clim.rename(da.name+'_gridcell_clim')
+        clim = clim.rename(da.name+'__clim')
         return clim
     
-    elif metric == 'anom':
+    if metric == 'anom':
         clim = da.groupby('time.month').mean(dim='time')
         anom = da.groupby('time.month') - clim
         anom = anom.rename(da.name+'_gridcell_anom')
         return anom
     
-    elif metric == 'var':
+    if metric == 'var':
         clim = da.groupby('time.month').mean(dim='time')
         anom = da.groupby('time.month') - clim
-#         var = anom.var(dim='time') ## single value, variance of all 3600 months
         var = anom.groupby('time.month').var(dim='time') ## 12 values, variance for each month
         var = var.rename(da.name+'_gridcell_var')
         var.attrs['description'] = 'variance of each month over the 300 year control simulation'
         return var
-
-    else:
-        print('<invalid parameters>')
-        return
-
-    
-#################################################################################
-#################################################################################
-def save_gridcell_calc(
-    ds, var, write_rootdir, subdir):
-    
-    filename = var.lower()+'_so_gridcell_metrics.nc'
-    path = write_rootdir+subdir+var.upper()+'/'+filename
-    ds.to_netcdf(path)
-    print(path)
 
 
 #################################################################################
@@ -280,7 +243,7 @@ def reg_annual_mean(
         area_sum = area.sum(dim={'xt_ocean', 'yt_ocean'})
         global_var = ds[var]
         if var == 'SIE_area' or var == 'SIV_area':
-            annual_mean = global_var.groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}).groupby('time.year').mean(dim='time')
+            annual_mean = global_var.sum(dim={'xt_ocean', 'yt_ocean'}).groupby('time.year').mean(dim='time')
         else:
             annual_mean = (global_var * ocean_grid['area_t']).groupby('time.year').mean(dim='time').sum(dim={'xt_ocean', 'yt_ocean'}) / area_sum
         annual_mean.name = 'Global'
@@ -582,7 +545,9 @@ def comp_ppp(
 #################################################################################
 #################################################################################    
     
-def comp_clim(var, reg, save=False): 
+def comp_clim(
+    var, reg, save=False): 
+    
     writedir = '/home/bbuchovecky/storage/so_predict_derived/CTRL/'
     subdir = var.upper()+'/'
     filename = var.lower()+'_ts_'+reg+'_monthly_mean.nc'
