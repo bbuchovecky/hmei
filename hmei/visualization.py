@@ -641,7 +641,9 @@ def ppp_grid(
 #################################################################################
 #################################################################################
     
-def plot_clim(var, reg, so_reg='SouthernOcean', leg_loc='outside', figsize=(10,5)):
+def plot_clim(
+    var, reg, so_reg='SouthernOcean', leg_loc='outside', figsize=(10,5)):
+    
     reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
                        'Ross':'orange', 'AmundBell':'magenta'})
     var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
