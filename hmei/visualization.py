@@ -7,6 +7,8 @@ warnings.filterwarnings("ignore", message="invalid value encountered in reduce")
 import xarray as xr
 import math
 import numpy as np
+import pickle as pkl
+
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
@@ -303,46 +305,85 @@ def stdev_plot(
 #################################################################################
 #################################################################################
 def open_ppp(
-    var, reg, timescale='monthly'):
+    var, reg, timescale='monthly', ens_type=''):
     
     writedir = '/home/bbuchovecky/storage/so_predict_derived/'
     subdir = 'PPP/'+var.upper()+'/'
-    filename = var.lower()+'_ts_'+reg+'_'+timescale+'_ppp.nc'
+    if ens_type != '':
+        ens_type += '_'
+    filename = var.lower()+'_ts_'+reg+'_'+timescale+'_'+ens_type+'ppp.nc'
     return xr.open_dataset(writedir+subdir+filename)
 
 #################################################################################
 #################################################################################
 
 def format_ppp_axes(
-    ax, timescale='monthly', summer_span=True, threshold=0.183, ymin=-0.2, ppp=None):
+    ax, timescale='monthly', first_2yrs=False, summer_span=True, threshold=0.183, ymin=-0.2, ppp=None):
     
-    if timescale == 'monthly':
-        ax.hlines(threshold, 0, 121, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
-        ax.set_xlim(1,120)
+    if not first_2yrs:
+    
+        if timescale == 'monthly':
+            ax.hlines(threshold, 0, 121, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+            ax.set_xlim(1,120)
+
+        if timescale == 'annual':
+            ax.hlines(threshold, 0, 11, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+            ax.set_ylim(1,10)
+
+        ax.set_ylim(ymin, 1.0)
+        if ppp != None:
+            if ppp.min() < 0:
+                ax.set_ylim(round(ppp.min().values-0.0, 1)-0.1, 1.0)
+            if ppp.min() > 0:
+                ax.set_ylim(0.0,1.0)
+
+        if summer_span and timescale == 'monthly':
+            for m in np.arange(0,120,12):
+                if m < 1:
+                    ax.axvspan(m, m+3, alpha=0.25, color='gray', label='Months DJFM')
+                else:
+                    ax.axvspan(m, m+3, alpha=0.25, color='gray')
+
+        ## set xticks and labels
+        yrs = np.array([2,4,6,8,10])
+        if timescale == 'monthly':
+            ax.set_xticks(yrs*12)
+        ax.set_xticklabels(yrs)
         
-    if timescale == 'annual':
-        ax.hlines(threshold, 0, 11, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
-        ax.set_ylim(1,10)
+        ax.set_xlabel('Lead time (year)')
         
-    ax.set_ylim(ymin, 1.0)
-    if ppp != None:
-        if ppp.min() < 0:
-            ax.set_ylim(round(ppp.min().values-0.0, 1)-0.1, 1.0)
-        if ppp.min() > 0:
-            ax.set_ylim(0.0,1.0)
-    
-    if summer_span and timescale == 'monthly':
-        for m in np.arange(-1,120,12):
-            if m < 0:
-                ax.axvspan(m, m+4, alpha=0.25, color='gray', label='Months DJFM')
-            else:
-                ax.axvspan(m, m+4, alpha=0.25, color='gray')
-    
-    ## set xticks and labels
-    yrs = np.array([2,4,6,8,10])
-    if timescale == 'monthly':
-        ax.set_xticks(yrs*12)
-    ax.set_xticklabels(yrs)
+    if first_2yrs:
+        
+        if timescale == 'monthly':
+            ax.hlines(threshold, 0, 25, color='k', linestyle='-.', label='Predictability threshold ('+str(threshold)+')')
+            ax.set_xlim(1,24)
+
+        ax.set_ylim(ymin, 1.0)
+        if ppp != None:
+            if ppp.min() < 0:
+                ax.set_ylim(round(ppp.min().values-0.0, 1)-0.1, 1.0)
+            if ppp.min() > 0:
+                ax.set_ylim(0.0,1.0)
+
+        if summer_span and timescale == 'monthly':
+            for m in np.arange(0,36,12):
+                if m < 1:
+                    ax.axvspan(m, m+3, alpha=0.25, color='gray', label='Months DJFM')
+                else:
+                    ax.axvspan(m, m+3, alpha=0.25, color='gray')
+
+        ## set xticks and labels
+        file = open('/home/bbuchovecky/storage/so_predict_derived/plotting_dicts.pkl','rb')
+        plotting_dicts = pkl.load(file)
+        file.close()
+        abbrv_month_names = plotting_dicts['abbrv_month_names']
+        
+        month_ticks = np.arange(1,24,2)
+        if timescale == 'monthly':
+            ax.set_xticks(month_ticks)
+        ax.set_xticklabels((abbrv_month_names*2)[slice(0,25,2)])
+        
+        ax.set_xlabel('Lead time (month)')
     
     return ax
 
@@ -350,77 +391,80 @@ def format_ppp_axes(
 #################################################################################
 
 def plot_ppp(
-    var, reg, so_reg='SouthernOcean', timescale='monthly', summer_span=True, threshold=0.183, figsize=(10,5), leg_loc='upper right'):
+    var, reg, timescale='monthly', subset=False, figsize=(10,5), leg_loc='upper right', bbox_to_anchor=(1,0.7), **kwargs):
     
-    reg_colors = dict({'SouthernOcean':'black', 'Weddell':'red', 'Indian':'blue', 'WestPacific':'green', 
-                       'Ross':'orange', 'AmundBell':'magenta'})
-    var_colors = dict({'npp':'limegreen', 'mld':'black', 'sie':'blue', 'sst':'red', 'sss':'darkorange', 
-                       'cn_inv':'deepskyblue', 'pco2surf':'magenta', 'siv':'darkslateblue'})
-    reg_names = dict({'SouthernOcean':'Pan-Antarctic', 'Weddell':'Weddell', 'Indian':'Indian', 
-                      'WestPacific':'West Pacific', 'Ross':'Ross', 'AmundBell':'A and B'})
-    var_su_names = dict({'npp':'NPP', 'mld':'MLD', 'sie':'SIE', 'sst':'SST', 'sss':'SSS', 
-                         'cn_inv':'SIC', 'pco2surf':'Surface pCO$_2$', 'siv':'SIV'})
-    var_lu_names = dict({'npp':'Net Primary Production', 'mld':'Mixed Layer Depth', 'sie':'Sea Ice Extent',
-                         'sst':'Sea Surface Temperature', 'sss':'Sea Surface Salinity', 
-                         'cn_inv':'Sea Ice Concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea Ice Volume'})
-    var_ll_names = dict({'npp':'Net primary production', 'mld':'Mixed layer depth', 
-                         'sie':'Sea ice extent', 'sst':'Sea surface temperature', 'sss':'Sea surface salinity',
-                         'cn_inv':'Sea ice concentration', 'pco2surf':'Surface pCO$_2$', 'siv':'Sea ice volume'})
-        
-    if type(var) == str and type(so_reg) == str:
-        fig,ax = plt.subplots(figsize=figsize)
-        
-        if reg == 'global':
-            title = 'Global '+var_lu_names[var.lower()]
+    file = open('/home/bbuchovecky/storage/so_predict_derived/plotting_dicts.pkl','rb')
+    plotting_dicts = pkl.load(file)
+    file.close()
+    
+    reg_colors = plotting_dicts['reg_colors']
+    var_colors = plotting_dicts['var_colors']
+    reg_names = plotting_dicts['reg_names']
+    var_su_names = plotting_dicts['var_su_names']
+    var_lu_names = plotting_dicts['var_lu_names']
+    var_ll_names = plotting_dicts['var_ll_names']
+    ltx_units = plotting_dicts['ltx_units']
+    uni_units = plotting_dicts['uni_units']
+    ltx_var_units = plotting_dicts['ltx_var_units']
+    uni_var_units = plotting_dicts['uni_var_units']
+    abbrv_month_names = plotting_dicts['abbrv_month_names']
+    
+    fig,ax = plt.subplots(figsize=figsize)
+    
+    subset_title = ''
+    ens_type = ''
+    if subset:
+        ens_type = 'subset'
+        subset_title = ' (subset=True)'
+
+    if type(var) == str and type(reg) == str:
+        if reg.lower() == 'global':
+            title = 'Global - '+var_lu_names[var.lower()]+' - PPP'+subset_title
+            ppp = open_ppp(var, 'global', timescale, ens_type=ens_type)
+            reg = 'Global'
+
+        if reg.lower() != 'global':
+            title = reg_names[reg]+' - '+var_lu_names[var.lower()]+' - PPP'+subset_title
+            ppp = open_ppp(var, 'so', timescale, ens_type=ens_type)
+            
+        ax.plot(ppp['nT'], ppp[reg], color='red', label=var_su_names[var])
+        ax = format_ppp_axes(ax, timescale=timescale, **kwargs)
+         
+    if type(var) == list and type(reg) == str:      
+        if reg.lower() == 'global':
+            title= 'Global - PPP'+subset_title
             r = 'Global'
 
-        if reg == 'so':
-            title = reg_names[so_reg]+' '+var_lu_names[var.lower()]
-            r = so_reg
-        
-        ppp = open_ppp(var, reg, timescale)
-        ax.plot(ppp['nT'], ppp[r], color='red', label=var_su_names[var])
-
-        ax = format_ppp_axes(ax, timescale=timescale, summer_span=summer_span, threshold=threshold)
-        
-        
-    if type(var) == list and type(so_reg) == str:
-        fig,ax = plt.subplots(figsize=figsize)
-        
-        if reg == 'global':
-            title = 'Global'
-            r = 'Global'
-
-        if reg == 'so':
-            title = reg_names[so_reg]
-            r = so_reg
+        if reg.lower() != 'global':
+            title = reg_names[reg]+' - PPP'+subset_title
+            r = 'so'
         
         for v in var:
-            ppp = open_ppp(v, reg, timescale)
-            ax.plot(ppp['nT'], ppp[r], color=var_colors[v], label=var_su_names[v.lower()])
+            ppp = open_ppp(v, r, timescale, ens_type=ens_type)
+            ax.plot(ppp['nT'], ppp[reg], color=var_colors[v], label=var_su_names[v.lower()])
+
+        ax = format_ppp_axes(ax, timescale=timescale, **kwargs)
         
-        ax = format_ppp_axes(ax, timescale=timescale, summer_span=summer_span, threshold=threshold)
+    if type(reg) == list and type(var) == str:
+        ppp = open_ppp(var, 'so', timescale, ens_type=ens_type)
         
-    if type(so_reg) == list and type(var) == str:
-        fig,ax = plt.subplots(figsize=figsize)
-        
-        ppp = open_ppp(var, reg, timescale)
-        for r in so_reg:
+        for r in reg:
             ax.plot(ppp['nT'], ppp[r], color=reg_colors[r], label=reg_names[r])
 
-        title = var_lu_names[var]
+        title = var_lu_names[var]+' - PPP'+subset_title
         
-        ax = format_ppp_axes(ax, timescale=timescale, summer_span=summer_span, threshold=threshold)
+        ax = format_ppp_axes(ax, timescale=timescale, **kwargs)
 
-    ax.set_xlabel('Lead time (yr)')
     ax.set_ylabel('PPP')
     ax.set_title(title)
     
     ## set up legend
-    leg = ax.legend(loc=leg_loc);
+    leg = ax.legend(bbox_to_anchor=bbox_to_anchor);
     for line in leg.get_lines():
         line.set_linewidth(2.0)
         line.set_linestyle(line.get_linestyle())
+        
+    fig.tight_layout()
         
     return fig,ax
 
